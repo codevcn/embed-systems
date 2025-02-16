@@ -1,0 +1,66 @@
+#include <driver/i2s.h>
+
+// Cấu hình chân I2S
+#define I2S_WS 5    // Word Select (L/R clock) - Chân LRC của INMP441 (GPIO 14)
+#define I2S_SD 2    // Serial Data - Chân DOUT của INMP441 (GPIO 4)
+#define I2S_SCK 22  // Serial Clock - Chân BCLK của INMP441 (GPIO 22)
+
+#define SAMPLE_RATE 16000  // Tần số lấy mẫu (samples per second)
+
+void setupI2S() {
+  i2s_config_t i2s_config = {
+    .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),  // Chế độ Master và nhận dữ liệu
+    .sample_rate = SAMPLE_RATE,                         // Tần số lấy mẫu
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,       // Độ sâu bit (32 bit mỗi mẫu)
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,        // Chỉ kênh trái (INMP441 chỉ có một kênh)
+    .communication_format = I2S_COMM_FORMAT_I2S,        // Định dạng giao tiếp I2S
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,           // Cấp ngắt
+    .dma_buf_count = 8,                                 // Số lượng buffer DMA
+    .dma_buf_len = 64                                   // Kích thước mỗi buffer DMA
+  };
+
+  i2s_pin_config_t pin_config = {
+    .bck_io_num = I2S_SCK,
+    .ws_io_num = I2S_WS,
+    .data_out_num = I2S_PIN_NO_CHANGE,
+    .data_in_num = I2S_SD
+  };
+
+  // Cài đặt I2S
+  i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+  i2s_set_pin(I2S_NUM_0, &pin_config);
+  i2s_set_clk(I2S_NUM_0, SAMPLE_RATE, I2S_BITS_PER_SAMPLE_32BIT, I2S_CHANNEL_MONO);
+}
+
+void setup() {
+  Serial.begin(115200);  // Khởi động Serial Monitor
+  setupI2S();            // Cấu hình I2S
+  Serial.println("\nINMP441 I2S Microphone initialized");
+
+  // In tiêu đề cho Serial Plotter
+  Serial.println("MyMin,SampleValue,MyMax");
+}
+
+void loop() {
+
+  const int buffer_size = 1024;       // Kích thước buffer để đọc dữ liệu
+  char i2s_read_buffer[buffer_size];  // Buffer để lưu dữ liệu đọc được
+
+  size_t bytes_read;  // Số byte thực tế được đọc
+  i2s_read(I2S_NUM_0, &i2s_read_buffer, buffer_size, &bytes_read, portMAX_DELAY);
+
+  // Chuyển dữ liệu thành giá trị mẫu âm thanh
+  for (int i = 0; i < bytes_read / 4; i++) {  // Mỗi mẫu 32-bit
+    int32_t sample = ((int32_t*)i2s_read_buffer)[i];
+
+    Serial.print("Min:");
+    Serial.print(-100000000);  // Giá trị min
+
+    Serial.print(" Mic:");
+    Serial.print(sample);  // Giá trị âm thanh từ I2S
+
+    Serial.print(" Max:");
+    Serial.println(100000000);  // Giá trị max
+  }
+  delay(1);
+}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nghe Lại Âm Thanh</title>
+  </head>
+  <body>
+    <h2>Danh sách file ghi âm:</h2>
+    <ul id="file-list"></ul>
+
+    <script>
+      async function loadFiles() {
+        let response = await fetch("/files");
+        let files = await response.json();
+
+        let list = document.getElementById("file-list");
+        list.innerHTML = "";
+
+        files.forEach((file) => {
+          let li = document.createElement("li");
+          li.innerHTML = `<a href="/static/${file}" target="_blank">${file}</a> 
+                    <audio controls>
+                        <source src="/static/${file}" type="audio/wav">
+                    </audio>`;
+          list.appendChild(li);
+        });
+      }
+
+      loadFiles();
+    </script>
+  </body>
+</html>

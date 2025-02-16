@@ -1,0 +1,107 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <driver/i2s.h>
+
+// Cấu hình WiFi
+const char* ssid = "DLM";
+const char* password = "datloimai0008";
+
+// Cấu hình server Flask
+const char* serverURL = "http://192.168.2.3:5000/upload";  // Thay IP đúng với Flask server
+
+// Cấu hình I2S
+#define I2S_WS 5    // LRC
+#define I2S_SD 2    // DOUT
+#define I2S_SCK 22  // BCLK
+
+#define SAMPLE_RATE 16000
+#define BUFFER_SIZE 1024  // Kích thước buffer gửi HTTP
+
+void setupI2S() {
+  i2s_config_t i2s_config = {
+    .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
+    .sample_rate = SAMPLE_RATE,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
+    .communication_format = I2S_COMM_FORMAT_I2S,
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+    .dma_buf_count = 8,
+    .dma_buf_len = 64
+  };
+
+  i2s_pin_config_t pin_config = {
+    .bck_io_num = I2S_SCK,
+    .ws_io_num = I2S_WS,
+    .data_out_num = I2S_PIN_NO_CHANGE,
+    .data_in_num = I2S_SD
+  };
+
+  i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+  i2s_set_pin(I2S_NUM_0, &pin_config);
+  i2s_set_clk(I2S_NUM_0, SAMPLE_RATE, I2S_BITS_PER_SAMPLE_32BIT, I2S_CHANNEL_MONO);
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi Connected!");
+
+  setupI2S();
+  
+  // In tiêu đề cho Serial Plotter
+  Serial.println("MyMin,SampleValue,MyMax");
+}
+
+void printAudio() {
+  const int buffer_size = BUFFER_SIZE;       // Kích thước buffer để đọc dữ liệu
+  char i2s_read_buffer[buffer_size];  // Buffer để lưu dữ liệu đọc được
+
+  size_t bytes_read;  // Số byte thực tế được đọc
+  i2s_read(I2S_NUM_0, &i2s_read_buffer, buffer_size, &bytes_read, portMAX_DELAY);
+
+  // Chuyển dữ liệu thành giá trị mẫu âm thanh
+  for (int i = 0; i < bytes_read / 4; i++) {  // Mỗi mẫu 32-bit
+    int32_t sample = ((int32_t*)i2s_read_buffer)[i];
+
+    Serial.print("Min:");
+    Serial.print(-100000000);  // Giá trị min
+
+    Serial.print(" Mic:");
+    Serial.print(sample);  // Giá trị âm thanh từ I2S
+
+    Serial.print(" Max:");
+    Serial.println(100000000);  // Giá trị max
+  }
+}
+
+void sendAudio() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi Disconnected!");
+    return;
+  }
+
+  HTTPClient http;
+  http.begin(serverURL);
+  http.addHeader("Content-Type", "application/octet-stream");
+
+  char audioBuffer[BUFFER_SIZE];
+  size_t bytesRead;
+
+  i2s_read(I2S_NUM_0, &audioBuffer, BUFFER_SIZE, &bytesRead, portMAX_DELAY);
+  Serial.printf("Sending %d bytes...\n", bytesRead);
+
+  int httpResponseCode = http.POST((uint8_t*)audioBuffer, bytesRead);
+  Serial.printf("HTTP Response Code: %d\n", httpResponseCode);
+
+  http.end();
+}
+
+void loop() {
+  sendAudio();
+  delay(2000);  // Gửi mỗi 2 giây
+  // printAudio();
+}

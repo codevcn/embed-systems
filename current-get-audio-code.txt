@@ -1,0 +1,52 @@
+from flask import Flask, render_template, send_from_directory, request
+from flask_socketio import SocketIO
+import numpy as np
+import soundfile as sf
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+audio_buffer = []
+OUTPUT_FILE = "static/audio.wav"
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/audio.wav")
+def get_audio():
+    return send_from_directory("static", "audio.wav")
+
+
+@socketio.on("audio")
+def handle_audio(data):
+    print(">>> den")
+    global audio_buffer
+    samples = np.frombuffer(data, dtype=np.int16)
+    audio_buffer.extend(samples)
+
+
+@socketio.on("connect")
+def handle_connect():
+    print(">>> ESP32 connected websocket successfully!")
+
+
+@socketio.on_error_default
+def default_error_handler(e):
+    print(f">>> Lỗi WebSocket: {e}")
+    print(f">>> Headers: {request.headers}")
+
+
+@socketio.on("save")
+def save_audio():
+    global audio_buffer
+    if len(audio_buffer) > 0:
+        sf.write(OUTPUT_FILE, np.array(audio_buffer), 16000)
+        audio_buffer = []
+        print("Audio saved!")
+
+
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=5000)
