@@ -17,7 +17,7 @@ def upload_audio():
     audio_data = request.data  # Nhận dữ liệu từ ESP32
     if not audio_data:
         return "No data received", 400
-    
+
     # Kiểm tra xem dữ liệu có rỗng không
     data_length = len(audio_data)
     print(f">>> Received audio data: {data_length} bytes")
@@ -34,7 +34,7 @@ def upload_audio():
     return "Received", 200
 
 
-UPLOAD_FOLDER = "static"
+UPLOAD_FOLDER = "src/audios"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -44,9 +44,10 @@ def list_files():
     return jsonify(files)
 
 
-@app.route("/static/<filename>", methods=["GET"])
+@app.route("/src/audios/<filename>", methods=["GET"])
 def get_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    print(">>> filename:", filename)
+    return send_from_directory(f"../{UPLOAD_FOLDER}", filename)
 
 
 if __name__ == "__main__":

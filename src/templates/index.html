@@ -19,9 +19,10 @@
 
         files.forEach((file) => {
           let li = document.createElement("li");
-          li.innerHTML = `<a href="/static/${file}" target="_blank">${file}</a> 
+          li.innerHTML = `
+                    <a href="/src/audios/${file}" target="_blank">${file}</a> 
                     <audio controls>
-                        <source src="/static/${file}" type="audio/wav">
+                        <source src="/src/audios/${file}" type="audio/wav">
                     </audio>`;
           list.appendChild(li);
         });
